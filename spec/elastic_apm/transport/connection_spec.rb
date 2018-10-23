@@ -19,7 +19,7 @@ module ElasticAPM
           subject.write('{"msg": "hey!"}')
           expect(subject).to be_connected
 
-          subject.close!
+          subject.flush
           expect(subject).to_not be_connected
 
           expect(stub).to have_been_requested
@@ -34,7 +34,7 @@ module ElasticAPM
           stub = build_stub(to_return: { status: 500, body: errors.to_json })
 
           subject.write('{}')
-          subject.close!
+          subject.flush
 
           expect(stub).to have_been_requested.once
         end
@@ -58,7 +58,7 @@ module ElasticAPM
           build_stub
 
           subject.write('{}')
-          subject.close!
+          subject.flush
 
           expect(subject).to_not be_connected
 
@@ -91,7 +91,7 @@ module ElasticAPM
           build_stub
 
           subject.write('{}')
-          subject.close!
+          subject.flush
 
           expect(subject).to_not be_connected
 
@@ -136,7 +136,7 @@ module ElasticAPM
           end
 
           subject.write('{}')
-          subject.close!
+          subject.flush
 
           expect(stub).to have_been_requested
         end
@@ -152,7 +152,7 @@ module ElasticAPM
             Thread.new { subject.write(%({"thread": #{i}})) }
           end.each(&:join)
 
-          subject.close!
+          subject.flush
 
           expect(stub).to have_been_requested.once
         end

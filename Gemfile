@@ -42,6 +42,8 @@ else
   gem framework
 end
 
+gem 'delayed_job' unless version == 'master'
+
 group :bench do
   gem 'ruby-prof', require: nil, platforms: %i[ruby]
   gem 'stackprof', require: nil, platforms: %i[ruby]

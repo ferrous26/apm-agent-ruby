@@ -18,6 +18,36 @@ module ElasticAPM
           micros.to_f / 1_000
         end
       end
+
+      # @api private
+      class Container
+        class UnrecognizedResource < InternalError; end
+
+        def initialize(config)
+          @transaction = Serializers::TransactionSerializer.new(config)
+          @span = Serializers::SpanSerializer.new(config)
+          @error = Serializers::ErrorSerializer.new(config)
+        end
+
+        attr_reader :transaction, :span, :error
+
+        def serialize(resource)
+          case resource
+          when Transaction
+            transaction.build(resource)
+          when Span
+            span.build(resource)
+          when Error
+            error.build(resource)
+          else
+            raise UnrecognizedResource, resource.inspect
+          end
+        end
+      end
+
+      def self.new(config)
+        Container.new(config)
+      end
     end
   end
 end
