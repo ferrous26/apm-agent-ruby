@@ -142,22 +142,6 @@ module ElasticAPM
         end
       end
 
-      context 'thread safety' do
-        let(:config) { Config.new http_compression: false }
-
-        it 'handles threads ok' do
-          stub = build_stub
-
-          (1..32).map do |i|
-            Thread.new { subject.write(%({"thread": #{i}})) }
-          end.each(&:join)
-
-          subject.flush
-
-          expect(stub).to have_been_requested.once
-        end
-      end
-
       # rubocop:disable Metrics/MethodLength
       def build_stub(body: nil, headers: {}, to_return: {}, &block)
         opts = {

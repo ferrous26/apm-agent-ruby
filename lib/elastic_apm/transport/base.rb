@@ -13,13 +13,13 @@ module ElasticAPM
         @config = config
         @queue = SizedQueue.new(config.api_buffer_size)
         @pool = Concurrent::FixedThreadPool.new(config.pool_size)
-        @workers = {}
+        @workers = []
       end
 
       attr_reader :config, :queue, :workers
 
       def start
-        boot_workers
+        ensure_worker_count
       end
 
       def stop
@@ -28,37 +28,61 @@ module ElasticAPM
 
       def submit(resource)
         queue.push(resource, true)
+        info '>' * queue.length
+
+        ensure_worker_count
       rescue ThreadError
-        error 'Queue is full (%i items), skipping…', config.api_buffer_size
+        warn 'Queue is full (%i items), skipping…', config.api_buffer_size
         nil
       end
 
       private
 
-      def boot_workers
-        @workers = (0...config.pool_size).each_with_object({}) do |i, workers|
-          worker = Worker.new(config, queue)
-          workers[i] = worker
+      def ensure_worker_count
+        missing = config.pool_size - @workers.length
+        return unless missing > 0
 
-          @pool.post do
+        info 'Booting %i workers', missing
+        missing.times { boot_worker }
+      end
+
+      # rubocop:disable Metrics/MethodLength
+      def boot_worker
+        worker = Worker.new(config, queue)
+        @workers.push worker
+
+        @pool.post do
+          begin
             worker.work_forever
-            @workers.delete(i)
+          rescue Exception => e
+            warn 'Worker died with exception: %s', e.inspect
+            debug e.backtrace
+          ensure
+            @workers.delete(worker)
           end
         end
       end
+      # rubocop:enable Metrics/MethodLength
 
       def stop_workers
         return unless @pool.running?
 
         debug 'Stopping workers'
-        @workers.values.each { queue << Worker::StopMessage.new }
-        @pool.shutdown
+        send_stop_messages
+
         debug 'Shutting down pool'
+        @pool.shutdown
 
         return if @pool.wait_for_termination(5)
 
         warn "Worker pool didn't close in 5 secs, killing ..."
         @pool.kill
+      end
+
+      def send_stop_messages
+        @workers.each { queue.push(Worker::StopMessage.new, true) }
+      rescue ThreadError
+        warn 'Cannot push stop messages to worker queue as it is full'
       end
     end
   end

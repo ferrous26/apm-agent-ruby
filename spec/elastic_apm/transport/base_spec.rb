@@ -33,6 +33,11 @@ module ElasticAPM
       end
 
       describe '#submit' do
+        before do
+          # Avoid emptying the queue
+          allow(subject).to receive(:ensure_worker_count) { true }
+        end
+
         it 'adds stuff to the queue' do
           subject.submit Transaction.new
           expect(subject.queue.length).to be 1
@@ -44,7 +49,7 @@ module ElasticAPM
           it 'skips if queue is full' do
             5.times { subject.submit Transaction.new }
 
-            expect(config.logger).to receive(:error)
+            expect(config.logger).to receive(:error).twice
 
             expect { subject.submit Transaction.new }
               .to_not raise_error

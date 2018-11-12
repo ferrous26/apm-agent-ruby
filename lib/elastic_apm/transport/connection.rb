@@ -47,7 +47,7 @@ module ElasticAPM
       def write(str)
         connect_unless_connected
 
-        @mutex.synchronize { append(str) }
+        append(str)
 
         return unless @bytes_sent >= @config.api_request_size
 
@@ -60,45 +60,39 @@ module ElasticAPM
       end
 
       def connected?
-        @mutex.synchronize { @connected }
+        @connected
       end
 
       def flush
-        @mutex.synchronize do
-          return unless @connected
+        return unless connected?
 
-          debug 'Closing request'
-          @wr.close
-          @conn_thread.join 5 if @conn_thread
-        end
+        debug 'Closing request'
+        @wr.close
+        @conn_thread.join 5 if @conn_thread
       end
 
       private
 
-      # rubocop:disable Metrics/MethodLength
       def connect_unless_connected
-        @mutex.synchronize do
-          return true if @connected
+        return true if connected?
 
-          debug 'Opening new request'
+        debug 'Opening new request'
 
-          reset!
+        reset!
 
-          @rd, @wr = ModdedIO.pipe
+        @rd, @wr = ModdedIO.pipe
 
-          enable_compression! if @config.http_compression?
+        enable_compression! if @config.http_compression?
 
-          perform_request_in_thread
-          wait_for_connection
+        perform_request_in_thread
+        wait_for_connection
 
-          schedule_closing if @config.api_request_time
+        schedule_closing if @config.api_request_time
 
-          append(@metadata)
+        append(@metadata)
 
-          true
-        end
+        true
       end
-      # rubocop:enable Metrics/MethodLength
 
       # rubocop:disable Metrics/MethodLength
       def perform_request_in_thread
@@ -157,7 +151,7 @@ module ElasticAPM
       end
 
       def wait_for_connection
-        until @connected
+        until connected? || @connection_error
           if (exception = @connection_error)
             @wr&.close
             raise FailedToConnectError, exception

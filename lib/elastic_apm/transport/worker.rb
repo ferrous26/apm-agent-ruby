@@ -39,6 +39,7 @@ module ElasticAPM
       # rubocop:disable Metrics/MethodLength
       def work_forever
         while (msg = queue.pop)
+          info '<' * (queue.length + 1)
           case msg
           when StopMessage
             stop
